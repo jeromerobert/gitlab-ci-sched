@@ -17,6 +17,7 @@ class Scheduler(object):
     SUCCESS = 'SUCCESS'
     RUN = 'RUN'
     LOCK_ONLY = 'LOCK_ONLY'
+    CANCELED = 'CANCELED'
 
     def __init__(self, gitlab_url, gitlab_token):
         self.dag = dag.DAG()
@@ -96,7 +97,8 @@ class Scheduler(object):
         Possible status are pending, running, success, failed, canceled, skipped. The logic is:
         -* one build pending or running => lock child
         - one build manual or skipped => run & lock child
-        - all build success, canceled, failed => store finished_at, if started_at < parent.finished_at then build
+        - one canceled => do nothing
+        - all build success, failed => store finished_at, if started_at < parent.finished_at then build
         """
         statuses = self.__strip_old_status(self.__raw_project_status(project))
         # Look only at build jobs
@@ -105,6 +107,8 @@ class Scheduler(object):
             return self.LOCK_ONLY, statuses
         elif self.__have_status(statuses, ['skipped', 'manual']):
             return self.RUN, statuses
+        elif self.__have_status(statuses, ['canceled']):
+            return self.CANCELED, statuses
         else:
             return self.SUCCESS, statuses
 
@@ -175,7 +179,7 @@ class Scheduler(object):
                     elif gs == self.RUN:
                         self.__lock_project(project)
                         self.__run_jobs(project[0], statuses)
-                    else:
+                    elif gs != self.CANCELED:
                         finished_at[project] = self.__last_finished_at(statuses)
                         logging.debug("Finished at " + str(finished_at[project]))
                         last_parent_date = None
