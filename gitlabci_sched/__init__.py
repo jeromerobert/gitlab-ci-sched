@@ -32,7 +32,7 @@ class Scheduler(object):
         """ Build the DAG. Each node is a tuple like ('group/project', 'branch') """
         pass
 
-    def _filter_jobs(self, statuses):
+    def _filter_statuses(self, statuses):
         """
         Keep only the status which will be used to get the pipeline status
         See https://docs.gitlab.com/ce/api/commits.html#get-the-status-of-a-commit
@@ -215,7 +215,7 @@ class YamlScheduler(Scheduler):
         if not self.dag.validate():
             raise RuntimeError("Invalid dag")
 
-    def _filter_jobs(self, statuses):
+    def _filter_statuses(self, statuses):
         """ Keep only the build statuses . We don't need to wait for the test jobs to run the next pipeline """
         return [x for x in statuses if 'build' in x.name and x.name != 'build-next']
 
