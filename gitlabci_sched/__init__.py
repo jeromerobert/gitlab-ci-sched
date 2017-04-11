@@ -103,7 +103,7 @@ class Scheduler(object):
         statuses = self._filter_statuses(statuses)
         if self.__have_status(statuses, ['pending', 'running']):
             return self.LOCK_ONLY, statuses
-        elif self.__have_status(statuses, ['canceled', 'skipped']):
+        elif self.__have_status(statuses, ['canceled', 'skipped', 'manual']):
             return self.RUN, statuses
         else:
             return self.SUCCESS, statuses
@@ -127,7 +127,7 @@ class Scheduler(object):
     def __run_jobs(self, project, statuses):
         """ Run skipped and canceled jobs """
         for s in statuses:
-            if s.status in ['canceled', 'skipped']:
+            if s.status in ['canceled', 'skipped', 'manual']:
                 logging.info("Playing build %d of project %s" % (s.id, project))
                 self.gitlab.project_builds.get(s.id, project_id=self.project_ids[project]).play()
 
