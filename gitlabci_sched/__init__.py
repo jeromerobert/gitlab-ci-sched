@@ -28,6 +28,7 @@ class Scheduler(object):
         self.project_ids = {}
         # Projects which must not be built
         self.locked_projects = set()
+        self.finished_at = {}
 
     def _fill_dag(self):
         """ Build the DAG. Each node is a tuple like ('group/project', 'branch') """
@@ -128,18 +129,20 @@ class Scheduler(object):
     def __first_started_at(statuses):
         return sorted(statuses, None, lambda x: x.started_at)[0].started_at
 
+    @staticmethod
+    def __first_created_at(statuses):
+        return sorted(statuses, None, lambda x: x.created_at)[0].created_at
+
     def __run_jobs(self, project, statuses):
         """ Run manual jobs """
+        p_id = self.project_ids[project]
         for s in statuses:
             if s.status in ['skipped', 'manual']:
                 logging.info("Playing build %d of project %s" % (s.id, project))
-                self.gitlab.project_builds.get(s.id, project_id=self.project_ids[project]).play()
-
-    def __retry_jobs(self, project, statuses):
-        """ Retry all jobs from statuses """
-        for s in statuses:
-            logging.info("Retrying build %d of project %s" % (s.id, project))
-            self.gitlab.project_builds.get(s.id, project_id=self.project_ids[project]).retry()
+                self.gitlab.project_builds.get(s.id, project_id=p_id).play()
+            if s.status == 'canceled':
+                logging.info("Retrying build %d of project %s" % (s.id, project))
+                self.gitlab.project_builds.get(s.id, project_id=p_id).retry()
 
     def __run_new_pipeline(self, project):
         logging.info("Running new pipeline for %s " % "/".join(project))
@@ -160,13 +163,24 @@ class Scheduler(object):
         self.locked_projects.add(project)
         self.locked_projects.update(self.dag.all_downstreams(project))
 
+    def __last_parent_date(self, project):
+        last_parent_date = None
+        for pred in self.dag.predecessors(project):
+            d = self.finished_at.get(pred, None)
+            logging.debug("Predecessor " + repr(pred) + " ended at " + str(d))
+            if last_parent_date is None:
+                last_parent_date = d
+            elif d > last_parent_date:
+                last_parent_date = d
+        return last_parent_date
+
     def run(self):
         """ Scheduling main loop """
         self._fill_dag()
         sorted_projects = self.dag.topological_sort()
         while True:
             try:
-                finished_at = {}
+                self.finished_at.clear()
                 self.locked_projects.clear()
                 for project in sorted_projects:
                     if project in self.locked_projects:
@@ -179,17 +193,14 @@ class Scheduler(object):
                     elif gs == self.RUN:
                         self.__lock_project(project)
                         self.__run_jobs(project[0], statuses)
-                    elif gs != self.CANCELED:
-                        finished_at[project] = self.__last_finished_at(statuses)
-                        logging.debug("Finished at " + str(finished_at[project]))
-                        last_parent_date = None
-                        for pred in self.dag.predecessors(project):
-                            d = finished_at.get(pred, None)
-                            logging.debug("Predecessor " + repr(pred) + " ended at " + str(d))
-                            if last_parent_date is None:
-                                last_parent_date = d
-                            elif d > last_parent_date:
-                                last_parent_date = d
+                    elif gs == self.CANCELED:
+                        last_parent_date = self.__last_parent_date(project)
+                        if last_parent_date is not None and self.__first_created_at(statuses) < last_parent_date:
+                            self.__run_jobs(project[0], statuses)
+                    else:
+                        self.finished_at[project] = self.__last_finished_at(statuses)
+                        logging.debug("Finished at " + str(self.finished_at[project]))
+                        last_parent_date = self.__last_parent_date(project)
                         if last_parent_date is not None and self.__first_started_at(statuses) < last_parent_date:
                             self.__run_new_pipeline(project)
             except gitlab.exceptions.GitlabConnectionError as e:
