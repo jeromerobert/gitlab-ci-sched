@@ -95,15 +95,15 @@ class Scheduler(object):
         """
         Possible status are pending, running, success, failed, canceled, skipped. The logic is:
         -* one build pending or running => lock child
-        - one build canceled or skipped => run & lock child
-        - all build success or failed => store finished_at, if started_at < parent.finished_at then build
+        - one build manual or skipped => run & lock child
+        - all build success, canceled, failed => store finished_at, if started_at < parent.finished_at then build
         """
         statuses = self.__strip_old_status(self.__raw_project_status(project))
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
         if self.__have_status(statuses, ['pending', 'running']):
             return self.LOCK_ONLY, statuses
-        elif self.__have_status(statuses, ['canceled', 'skipped', 'manual']):
+        elif self.__have_status(statuses, ['skipped', 'manual']):
             return self.RUN, statuses
         else:
             return self.SUCCESS, statuses
@@ -125,9 +125,9 @@ class Scheduler(object):
         return sorted(statuses, None, lambda x: x.started_at)[0].started_at
 
     def __run_jobs(self, project, statuses):
-        """ Run skipped and canceled jobs """
+        """ Run manual jobs """
         for s in statuses:
-            if s.status in ['canceled', 'skipped', 'manual']:
+            if s.status in ['skipped', 'manual']:
                 logging.info("Playing build %d of project %s" % (s.id, project))
                 self.gitlab.project_builds.get(s.id, project_id=self.project_ids[project]).play()
 
