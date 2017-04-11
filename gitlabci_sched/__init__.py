@@ -196,7 +196,7 @@ class Scheduler(object):
                     elif gs == self.CANCELED:
                         last_parent_date = self.__last_parent_date(project)
                         if last_parent_date is not None and self.__first_created_at(statuses) < last_parent_date:
-                            self.__run_jobs(project[0], statuses)
+                            self.__run_new_pipeline(project)
                     else:
                         self.finished_at[project] = self.__last_finished_at(statuses)
                         logging.debug("Finished at " + str(self.finished_at[project]))
