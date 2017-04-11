@@ -41,5 +41,5 @@ dag:
 then run `gitlab-ci-sched`
 
 You should also:
-* Set the root builds of your pipeline as [manual](https://docs.gitlab.com/ce/ci/yaml/#manual-actions)
+* Set the root builds of your pipeline as [manual](https://docs.gitlab.com/ce/ci/yaml/#manual-actions) **and blocking**.
 * Disable [pipeline triggers](https://docs.gitlab.com/ce/ci/triggers/README.html)
