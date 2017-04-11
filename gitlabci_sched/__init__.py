@@ -137,6 +137,13 @@ class Scheduler(object):
             logging.info("Retrying build %d of project %s" % (s.id, project))
             self.gitlab.project_builds.get(s.id, project_id=self.project_ids[project]).retry()
 
+    def __run_new_pipeline(self, project):
+        logging.info("Running new pipeline for %s " % "/".join(project))
+        pipeline = self.gitlab.project_pipelines.create({'project_id': self.project_ids[project[0]], 'ref': project[1]})
+        gs, statuses = self.__build_global_status(project)
+        self.__lock_project(project)
+        self.__run_jobs(project[0], statuses)
+
     def __retry_pipeline(self, project, statuses):
         """ Not used because Gitlab does not allow to retry a successful pipeline. Kept for the record. """
         p_id = self.project_ids[project]
@@ -180,8 +187,7 @@ class Scheduler(object):
                             elif d > last_parent_date:
                                 last_parent_date = d
                         if last_parent_date is not None and self.__first_started_at(statuses) < last_parent_date:
-                            self.__lock_project(project)
-                            self.__retry_jobs(project[0], statuses)
+                            self.__run_new_pipeline(project)
             except gitlab.exceptions.GitlabConnectionError as e:
                 logging.warning(e.error_message)
                 self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
