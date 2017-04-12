@@ -204,7 +204,12 @@ class Scheduler(object):
                         if last_parent_date is not None and self.__first_started_at(statuses) < last_parent_date:
                             self.__run_new_pipeline(project)
             except gitlab.exceptions.GitlabConnectionError as e:
+                logging.info(e.error_message)
+                self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
+            except gitlab.exceptions.GitlabError as e:
                 logging.warning(e.error_message)
+                self._wait_some_time()
+                self._wait_some_time()
                 self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
             self._wait_some_time()
 
