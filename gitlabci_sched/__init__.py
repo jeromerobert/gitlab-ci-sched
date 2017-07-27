@@ -104,6 +104,7 @@ class Scheduler(object):
         statuses = self.__strip_old_status(self.__raw_project_status(project))
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
+        logging.info("Computing status those build: "+" ".join([str(s.id) for s in statuses]))
         if self.__have_status(statuses, ['pending', 'running']):
             return self.LOCK_ONLY, statuses
         elif self.__have_status(statuses, ['skipped', 'manual']):
@@ -167,7 +168,7 @@ class Scheduler(object):
         last_parent_date = None
         for pred in self.dag.predecessors(project):
             d = self.finished_at.get(pred, None)
-            logging.debug("Predecessor " + repr(pred) + " ended at " + str(d))
+            logging.info("Predecessor " + repr(pred) + " ended at " + str(d))
             if last_parent_date is None:
                 last_parent_date = d
             elif d > last_parent_date:
@@ -185,7 +186,7 @@ class Scheduler(object):
                 for project in sorted_projects:
                     if project in self.locked_projects:
                         continue
-                    logging.debug("Processing project " + repr(project))
+                    logging.info("Processing project " + repr(project))
                     gs, statuses = self.__build_global_status(project)
                     logging.debug("Status is " + gs)
                     if gs == self.LOCK_ONLY:
@@ -250,7 +251,7 @@ class YamlScheduler(Scheduler):
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
     YamlScheduler('gitlab-ci-sched.yml').run()
 
 
