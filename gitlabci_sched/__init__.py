@@ -58,7 +58,7 @@ class Scheduler(object):
             project_id = self.gitlab.projects.get(project[0]).id
             self.project_ids[project[0]] = project_id
         commit_id = self.gitlab.project_branches.get(project_id=project_id, id=project[1]).commit['id']
-        r = self.gitlab.project_commit_statuses.list(project_id=project_id, commit_id=commit_id)
+        r = self.gitlab.project_commit_statuses.list(project_id=project_id, commit_id=commit_id, all=True)
         for s in r:
             try:
                 s.created_at = dateutil.parser.parse(s.created_at)
