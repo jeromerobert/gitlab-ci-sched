@@ -152,13 +152,6 @@ class Scheduler(object):
         self.__lock_project(project)
         self.__run_jobs(project[0], statuses)
 
-    def __retry_pipeline(self, project, statuses):
-        """ Not used because Gitlab does not allow to retry a successful pipeline. Kept for the record. """
-        p_id = self.project_ids[project]
-        pipeline_id = self.gitlab.project_builds.get(statuses[0].id, project_id=p_id).pipeline['id']
-        logging.info("Retrying pipeline %d" % pipeline_id)
-        self.gitlab.project_pipelines.get(pipeline_id, project_id=p_id).retry()
-
     def __lock_project(self, project):
         """ Tag a project as not-to-build """
         self.locked_projects.add(project)
