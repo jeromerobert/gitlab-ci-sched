@@ -124,7 +124,10 @@ class Scheduler(object):
 
     @staticmethod
     def __last_finished_at(statuses):
-        return sorted(statuses, None, lambda x: x.finished_at)[-1].finished_at
+        if len(statuses) == 0:
+            return None
+        else:
+            return sorted(statuses, None, lambda x: x.finished_at)[-1].finished_at
 
     @staticmethod
     def __first_started_at(statuses):
