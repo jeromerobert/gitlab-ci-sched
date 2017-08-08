@@ -26,6 +26,8 @@ class Scheduler(object):
         self.gitlab = gitlab.Gitlab(gitlab_url, gitlab_token)
         # cache for project ids. If projects id changes the deamon must be restarted
         self.project_ids = {}
+        # cache for triggers
+        self.triggers = {}
         # Projects which must not be built
         self.locked_projects = set()
         self.finished_at = {}
@@ -94,22 +96,23 @@ class Scheduler(object):
         return result
 
     def __build_global_status(self, project):
+
         """
-        Possible status are pending, running, success, failed, canceled, skipped. The logic is:
-        -* one build pending or running => lock child
-        - one build manual or skipped => run & lock child
-        - one canceled => do nothing
-        - all build success, failed => store finished_at, if started_at < parent.finished_at then build
+        Possible status are created, pending, running, failed, success, canceled, skipped, manual. The logic is:
+        - no build => build
+        - one build pending, running => lock child
+        - one build canceled, manual, skipped, failed => build if parent rebuilt
+        - all build success => store finished_at, if started_at < parent.finished_at then build
         """
         statuses = self.__strip_old_status(self.__raw_project_status(project))
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
         logging.info("Computing status those build: "+" ".join([str(s.id) for s in statuses]))
-        if self.__have_status(statuses, ['pending', 'running']):
-            return self.LOCK_ONLY, statuses
-        elif self.__have_status(statuses, ['skipped', 'manual']):
+        if len(statuses) == 0:
             return self.RUN, statuses
-        elif self.__have_status(statuses, ['canceled']):
+        elif self.__have_status(statuses, ['pending', 'running']):
+            return self.LOCK_ONLY, statuses
+        elif self.__have_status(statuses, ['canceled', 'skipped', 'manual', 'failed']):
             return self.CANCELED, statuses
         else:
             return self.SUCCESS, statuses
@@ -137,23 +140,31 @@ class Scheduler(object):
     def __first_created_at(statuses):
         return sorted(statuses, None, lambda x: x.created_at)[0].created_at
 
-    def __run_jobs(self, project, statuses):
-        """ Run manual jobs """
-        p_id = self.project_ids[project]
-        for s in statuses:
-            if s.status in ['skipped', 'manual']:
-                logging.info("Playing build %d of project %s" % (s.id, project))
-                self.gitlab.project_builds.get(s.id, project_id=p_id).play()
-            if s.status == 'canceled':
-                logging.info("Retrying build %d of project %s" % (s.id, project))
-                self.gitlab.project_builds.get(s.id, project_id=p_id).retry()
+    def __get_trigger(self, project_id):
+        """ Get or create a trigger """
+        result = self.triggers.get(project_id)
+        if result is None:
+            tl = self.gitlab.project_triggers.list(project_id=project_id)
+            if len(tl) == 0:
+                result = self.gitlab.project_triggers.create({}, project_id=project_id)
+            else:
+                result = tl[0]
+            self.triggers[project_id] = result
+        return result
+
+    def __trigger_variables(self, project):
+        """ Return variables for a trigger to describe the dependencies """
+        r = {}
+        for p_name, branch in self.dag.predecessors(project):
+            r['CI_REF_' + p_name.upper().replace('/', '_')] = branch
+        return r
 
     def __run_new_pipeline(self, project):
         logging.info("Running new pipeline for %s " % "/".join(project))
-        pipeline = self.gitlab.project_pipelines.create({'project_id': self.project_ids[project[0]], 'ref': project[1]})
-        gs, statuses = self.__build_global_status(project)
         self.__lock_project(project)
-        self.__run_jobs(project[0], statuses)
+        p = self.gitlab.projects.get(self.project_ids[project[0]])
+        token = self.__get_trigger(project[0]).token
+        p.trigger_build(project[1], token, self.__trigger_variables(project))
 
     def __lock_project(self, project):
         """ Tag a project as not-to-build """
@@ -188,17 +199,13 @@ class Scheduler(object):
                     if gs == self.LOCK_ONLY:
                         self.__lock_project(project)
                     elif gs == self.RUN:
-                        self.__lock_project(project)
-                        self.__run_jobs(project[0], statuses)
-                    elif gs == self.CANCELED:
+                        self.__run_new_pipeline(project)
+                    else:
+                        if gs == self.SUCCESS:
+                            self.finished_at[project] = self.__last_finished_at(statuses)
+                            logging.debug("Finished at " + str(self.finished_at[project]))
                         last_parent_date = self.__last_parent_date(project)
                         if last_parent_date is not None and self.__first_created_at(statuses) < last_parent_date:
-                            self.__run_new_pipeline(project)
-                    else:
-                        self.finished_at[project] = self.__last_finished_at(statuses)
-                        logging.debug("Finished at " + str(self.finished_at[project]))
-                        last_parent_date = self.__last_parent_date(project)
-                        if last_parent_date is not None and self.__first_started_at(statuses) < last_parent_date:
                             self.__run_new_pipeline(project)
             except gitlab.exceptions.GitlabConnectionError as e:
                 logging.info(e.error_message)
