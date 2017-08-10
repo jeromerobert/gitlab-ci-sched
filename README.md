@@ -36,9 +36,13 @@ dag:
   - jeromerobert/foo/master
   jeromerobert/bar/master:
   - jeromerobert/foo/master
+we_only: testfull.*
 ```
 
 then run `gitlab-ci-sched`
 
 You should also set all your job as [`except: pushes`](https://docs.gitlab.com/ce/ci/yaml/#only-and-except)
 to avoid doublon in pipeline creation.
+
+To use the `we_only` set your jobs as `when: manual` and they'll be
+run only during on saturday or sunday.

@@ -7,7 +7,7 @@ import re
 import dateutil.parser
 import logging
 import time
-
+import datetime
 
 class Scheduler(object):
     """
@@ -35,6 +35,9 @@ class Scheduler(object):
     def _fill_dag(self):
         """ Build the DAG. Each node is a tuple like ('group/project', 'branch') """
         pass
+
+    def _can_run_manual(self, project, job):
+        return False
 
     def _filter_statuses(self, statuses):
         """
@@ -95,6 +98,14 @@ class Scheduler(object):
             result.append(sorted(s, None, lambda x: x.created_at)[-1])
         return result
 
+    def __run_manual_jobs(self, project, statuses):
+        p_id = self.project_ids[project[0]]
+        for s in statuses:
+            if s.status == 'manual' and self._can_run_manual(project, s.name):
+                build = self.gitlab.project_builds.get(s.id, project_id=p_id)
+                logging.info("Running manual job %d in project %s", s.id, project[0])
+                build.play()
+
     def __build_global_status(self, project):
 
         """
@@ -105,6 +116,7 @@ class Scheduler(object):
         - all build success => store finished_at, if started_at < parent.finished_at then build
         """
         statuses = self.__strip_old_status(self.__raw_project_status(project))
+        self.__run_manual_jobs(project, statuses)
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
         logging.info("Computing status those build: "+" ".join([str(s.id) for s in statuses]))
@@ -226,6 +238,10 @@ class YamlScheduler(Scheduler):
         with open(yaml_file) as f:
             self.config = yaml.load(f)
             Scheduler.__init__(self, self.config['server']['url'], self.config['server']['token'])
+        if 'only_we' in self.config:
+            self.only_we = re.compile(self.config['only_we'])
+        else:
+            self.only_we = None
 
     def __parse_project(self, name):
         m = self.PROJECT_REGEX.match(name)
@@ -252,6 +268,10 @@ class YamlScheduler(Scheduler):
     def _wait_some_time(self):
         time.sleep(30)
 
+    def _can_run_manual(self, project, job):
+        return self.only_we is not None \
+            and datetime.datetime.today().weekday() >= 5 \
+            and self.only_we.match(job)
 
 def main():
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
