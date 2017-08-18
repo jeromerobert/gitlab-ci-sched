@@ -165,10 +165,12 @@ class Scheduler(object):
         return result
 
     def __trigger_variables(self, project):
-        """ Return variables for a trigger to describe the dependencies """
+        """ Return variables for a trigger to describe the dependencies
+            Should be built like the CI_COMMIT_REF_SLUG variable defined here:
+            https://gitlab.com/help/ci/variables/README.md#predefined-variables-environment-variables """
         r = {}
         for p_name, branch in self.dag.predecessors(project):
-            r['CI_REF_' + p_name.upper().replace('/', '_')] = branch
+            r['CI_REF_' + p_name.upper().replace('/', '_')] = re.sub('\W', '-', branch.lower() )
         return r
 
     def __run_new_pipeline(self, project):
