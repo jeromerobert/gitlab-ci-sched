@@ -240,10 +240,10 @@ class YamlScheduler(Scheduler):
         with open(yaml_file) as f:
             self.config = yaml.load(f)
             Scheduler.__init__(self, self.config['server']['url'], self.config['server']['token'])
-        if 'only_we' in self.config:
-            self.only_we = re.compile(self.config['only_we'])
+        if 'we_only' in self.config:
+            self.we_only = re.compile(self.config['we_only'])
         else:
-            self.only_we = None
+            self.we_only = None
 
     def __parse_project(self, name):
         m = self.PROJECT_REGEX.match(name)
@@ -271,9 +271,9 @@ class YamlScheduler(Scheduler):
         time.sleep(30)
 
     def _can_run_manual(self, project, job):
-        return self.only_we is not None \
+        return self.we_only is not None \
             and datetime.datetime.today().weekday() >= 5 \
-            and self.only_we.match(job)
+            and self.we_only.match(job)
 
 def main():
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
