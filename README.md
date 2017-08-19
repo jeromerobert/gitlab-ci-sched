@@ -37,6 +37,7 @@ dag:
   jeromerobert/bar/master:
   - jeromerobert/foo/master
 we_only: testfull.*
+email:bob@zboub.com
 ```
 
 then run `gitlab-ci-sched`
@@ -46,3 +47,5 @@ to avoid doublon in pipeline creation.
 
 To use the `we_only` set your jobs as `when: manual` and they'll be
 run only during on saturday or sunday.
+
+email: the mail adress given will be passed to the jobs as trigger vairable 'GITLAB_USER_EMAIL'

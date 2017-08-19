@@ -171,6 +171,8 @@ class Scheduler(object):
         r = {}
         for p_name, branch in self.dag.predecessors(project):
             r['CI_REF_' + p_name.upper().replace('/', '_')] = re.sub('\W', '-', branch.lower() )
+        if 'email' in self.config:
+            r['GITLAB_USER_EMAIL'] = self.config['email']
         return r
 
     def __run_new_pipeline(self, project):
