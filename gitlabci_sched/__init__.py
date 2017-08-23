@@ -120,7 +120,7 @@ class Scheduler(object):
         self.__run_manual_jobs(project, statuses)
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
-        logging.info("Computing status those build: "+" ".join([str(s.id) for s in statuses]))
+        logging.info("Computing status from those build: "+" ".join([str(s.id) for s in statuses]))
         if len(statuses) == 0:
             return self.RUN, statuses
         elif self.__have_status(statuses, ['pending', 'running']):
