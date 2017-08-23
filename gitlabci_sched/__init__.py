@@ -82,17 +82,18 @@ class Scheduler(object):
         return r
 
     @staticmethod
-    def __strip_old_status(statuses):
+    def __strip_old_status(statuses, branch):
         """
-        Return only the most recent statuses
+        Return only the most recent statuses for a given branch
         """
         by_job = {}
         for s in statuses:
-            l = by_job.get(s.name)
-            if l is None:
-                l = []
-                by_job[s.name] = l
-            l.append(s)
+            if s.ref == branch:
+                l = by_job.get(s.name)
+                if l is None:
+                    l = []
+                    by_job[s.name] = l
+                l.append(s)
         result = []
         for job, s in by_job.iteritems():
             result.append(sorted(s, None, lambda x: x.created_at)[-1])
@@ -115,7 +116,7 @@ class Scheduler(object):
         - one build canceled, manual, skipped, failed => build if parent rebuilt
         - all build success => store finished_at, if started_at < parent.finished_at then build
         """
-        statuses = self.__strip_old_status(self.__raw_project_status(project))
+        statuses = self.__strip_old_status(self.__raw_project_status(project), project[1])
         self.__run_manual_jobs(project, statuses)
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
