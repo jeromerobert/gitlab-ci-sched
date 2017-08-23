@@ -39,6 +39,9 @@ class Scheduler(object):
     def _can_run_manual(self, project, job):
         return False
 
+    def _additional_variables(self):
+        return {}
+
     def _filter_statuses(self, statuses):
         """
         Keep only the status which will be used to get the pipeline status
@@ -172,8 +175,7 @@ class Scheduler(object):
         r = {}
         for p_name, branch in self.dag.predecessors(project):
             r['CI_REF_' + p_name.upper().replace('/', '_')] = re.sub('\W', '-', branch.lower() )
-        if 'email' in self.config:
-            r['GITLAB_USER_EMAIL'] = self.config['email']
+        r.update(self._additional_variables())
         return r
 
     def __run_new_pipeline(self, project):
@@ -277,6 +279,12 @@ class YamlScheduler(Scheduler):
         return self.we_only is not None \
             and datetime.datetime.today().weekday() >= 5 \
             and self.we_only.match(job)
+
+    def _additional_variables(self):
+        if 'email' in self.config:
+            return {'GITLAB_USER_EMAIL': self.config['email']}
+        else:
+            return {}
 
 def main():
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
