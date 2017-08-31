@@ -191,11 +191,19 @@ class Scheduler(object):
         self.locked_projects.update(self.dag.all_downstreams(project))
 
     def __last_parent_date(self, project):
+        """
+        Return the date of the most recent parent job.
+        If a parent has not run yet, return None
+        """
         last_parent_date = None
         for pred in self.dag.predecessors(project):
             d = self.finished_at.get(pred, None)
             logging.info("Predecessor " + repr(pred) + " ended at " + str(d))
-            if last_parent_date is None:
+            if d is None:
+                # One predecessor as not run yet so no need to test others
+                last_parent_date = None
+                break
+            elif last_parent_date is None:
                 last_parent_date = d
             elif d > last_parent_date:
                 last_parent_date = d
