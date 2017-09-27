@@ -8,6 +8,7 @@ import dateutil.parser
 import logging
 import time
 import datetime
+import urllib
 
 class Scheduler(object):
     """
@@ -23,9 +24,12 @@ class Scheduler(object):
         self.dag = dag.DAG()
         self.gitlab_url = gitlab_url
         self.gitlab_token = gitlab_token
-        self.gitlab = gitlab.Gitlab(gitlab_url, gitlab_token)
-        # cache for project ids. If projects id changes the deamon must be restarted
-        self.project_ids = {}
+        self.gitlab = gitlab.Gitlab(gitlab_url, gitlab_token, api_version=4)
+        # This should be automatic but it's not
+        self.gitlab.session.proxies.update(urllib.getproxies_environment())
+        # Cache group/project to Gitlab project objects. If projects
+        # changes the deamon must be restarted
+        self.projects = {}
         # cache for triggers
         self.triggers = {}
         # Projects which must not be built
@@ -61,12 +65,12 @@ class Scheduler(object):
         :param project: a tuple ('group/project', 'branch')
         :return: And array of status
         """
-        project_id = self.project_ids.get(project[0])
-        if project_id is None:
-            project_id = self.gitlab.projects.get(project[0]).id
-            self.project_ids[project[0]] = project_id
-        commit_id = self.gitlab.project_branches.get(project_id=project_id, id=project[1]).commit['id']
-        r = self.gitlab.project_commit_statuses.list(project_id=project_id, commit_id=commit_id, all=True)
+        glproject = self.projects.get(project[0])
+        if glproject is None:
+            glproject = self.gitlab.projects.get(project[0])
+            self.projects[project[0]] = glproject
+        commit_id = glproject.branches.get(project[1]).commit['id']
+        r = glproject.commits.get(commit_id).statuses.list(all=True)
         for s in r:
             try:
                 s.created_at = dateutil.parser.parse(s.created_at)
@@ -103,10 +107,10 @@ class Scheduler(object):
         return result
 
     def __run_manual_jobs(self, project, statuses):
-        p_id = self.project_ids[project[0]]
+        p = self.projects[project[0]]
         for s in statuses:
             if s.status == 'manual' and self._can_run_manual(project, s.name):
-                build = self.gitlab.project_builds.get(s.id, project_id=p_id)
+                build = p.jobs.get(s.id)
                 logging.info("Running manual job %d in project %s", s.id, project[0])
                 build.play()
 
@@ -156,16 +160,16 @@ class Scheduler(object):
     def __first_created_at(statuses):
         return sorted(statuses, None, lambda x: x.created_at)[0].created_at
 
-    def __get_trigger(self, project_id):
+    def __get_trigger(self, glproject):
         """ Get or create a trigger """
-        result = self.triggers.get(project_id)
+        result = self.triggers.get(glproject.id)
         if result is None:
-            tl = self.gitlab.project_triggers.list(project_id=project_id)
+            tl = glproject.triggers.list()
             if len(tl) == 0:
-                result = self.gitlab.project_triggers.create({}, project_id=project_id)
+                result = p.triggers.create({})
             else:
                 result = tl[0]
-            self.triggers[project_id] = result
+            self.triggers[glproject.id] = result
         return result
 
     def __trigger_variables(self, project):
@@ -181,9 +185,9 @@ class Scheduler(object):
     def __run_new_pipeline(self, project):
         logging.info("Running new pipeline for %s " % "/".join(project))
         self.__lock_project(project)
-        p = self.gitlab.projects.get(self.project_ids[project[0]])
-        token = self.__get_trigger(project[0]).token
-        p.trigger_build(project[1], token, self.__trigger_variables(project))
+        p = self.projects[project[0]]
+        token = self.__get_trigger(p).token
+        p.trigger_pipeline(project[1], token, self.__trigger_variables(project))
 
     def __lock_project(self, project):
         """ Tag a project as not-to-build """
