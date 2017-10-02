@@ -69,8 +69,11 @@ class Scheduler(object):
         if glproject is None:
             glproject = self.gitlab.projects.get(project[0])
             self.projects[project[0]] = glproject
-        commit_id = glproject.branches.get(project[1]).commit['id']
-        r = glproject.commits.get(commit_id).statuses.list(all=True)
+        commit = glproject.branches.get(project[1]).commit
+        if commit is None:
+            # The branch does not exists or the repo is empty/broken
+            return None
+        r = glproject.commits.get(commit['id']).statuses.list(all=True)
         for s in r:
             try:
                 s.created_at = dateutil.parser.parse(s.created_at)
@@ -123,7 +126,11 @@ class Scheduler(object):
         - one build canceled, manual, skipped, failed => build if parent rebuilt
         - all build success => store finished_at, if started_at < parent.finished_at then build
         """
-        statuses = self.__strip_old_status(self.__raw_project_status(project), project[1])
+        rps = self.__raw_project_status(project)
+        if rps is None:
+            # The repository contains no commit
+            return self.CANCELED, None
+        statuses = self.__strip_old_status(rps, project[1])
         self.__run_manual_jobs(project, statuses)
         # Look only at build jobs
         statuses = self._filter_statuses(statuses)
