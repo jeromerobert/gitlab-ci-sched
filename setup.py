@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 setup(
     name="gitlabci_sched",
-    version="0.1",
+    version="0.2",
     packages=['gitlabci_sched'],
     entry_points = {
         'console_scripts': ['gitlab-ci-sched=gitlabci_sched:main'],
