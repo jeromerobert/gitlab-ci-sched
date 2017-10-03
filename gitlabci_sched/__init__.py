@@ -9,6 +9,7 @@ import logging
 import time
 import datetime
 import urllib
+import requests
 
 class Scheduler(object):
     """
@@ -25,7 +26,7 @@ class Scheduler(object):
         self.gitlab_url = gitlab_url
         self.gitlab_token = gitlab_token
         self.gitlab = gitlab.Gitlab(gitlab_url, gitlab_token, api_version=4)
-        # This should be automatic but it's not
+        # TODO: This should be automatic but it's not (python-gitlab bug)
         self.gitlab.session.proxies.update(urllib.getproxies_environment())
         # Cache group/project to Gitlab project objects. If projects
         # changes the deamon must be restarted
@@ -250,6 +251,13 @@ class Scheduler(object):
                 self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
             except gitlab.exceptions.GitlabError as e:
                 logging.warning(e.error_message)
+                self._wait_some_time()
+                self._wait_some_time()
+                self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
+            # TODO: catching requests.exceptions.ConnectionError should be managed by python-gitlab
+            # but it's not (python-gitlab bug)
+            except requests.exceptions.RequestException as e:
+                logging.warning(repr(e))
                 self._wait_some_time()
                 self._wait_some_time()
                 self.gitlab = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
