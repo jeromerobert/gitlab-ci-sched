@@ -8,7 +8,7 @@ setup(
     entry_points = {
         'console_scripts': ['gitlab-ci-sched=gitlabci_sched:main'],
     },
-    install_requires=['python-gitlab>=1.0.1', 'py-dag', 'PyYAML', 'python-dateutil'],
+    install_requires=['python-gitlab>=1.1.0', 'py-dag', 'PyYAML', 'python-dateutil'],
     author="Jerome Robert",
     author_email="jeromerobert@gmx.com",
     description="This is a scheduler for Gitlab-CI jobs with inter projects dependencies",
