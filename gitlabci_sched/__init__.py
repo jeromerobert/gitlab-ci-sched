@@ -172,11 +172,13 @@ class Scheduler(object):
         """ Get or create a trigger """
         result = self.triggers.get(glproject.id)
         if result is None:
-            tl = glproject.triggers.list()
-            if len(tl) == 0:
-                result = p.triggers.create({})
-            else:
-                result = tl[0]
+            for trigger in glproject.triggers.list():
+                legacy = trigger.owner is None and trigger.description is None
+                if not legacy:
+                    result = trigger
+                    break
+            if result is None:
+                result = glproject.triggers.create({'description': 'gitlab-ci-sched'})
             self.triggers[glproject.id] = result
         return result
 
