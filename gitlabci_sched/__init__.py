@@ -188,7 +188,7 @@ class Scheduler(object):
             https://gitlab.com/help/ci/variables/README.md#predefined-variables-environment-variables """
         r = {}
         for p_name, branch in self.dag.predecessors(project):
-            r['CI_REF_' + p_name.upper().replace('/', '_')] = re.sub('\W', '-', branch.lower() )
+            r['CI_REF_' + p_name.upper().replace('/', '_')] = re.sub('[^a-z0-9]', '-', branch.lower() )
         r.update(self._additional_variables())
         return r
 
