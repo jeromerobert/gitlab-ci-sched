@@ -10,7 +10,7 @@
 `./setup.py install --user`
 
 
-## Virtuaenv
+## Virtualenv
 
 ```
 virtualenv env
@@ -27,7 +27,7 @@ server:
   url: https://gitlab.com
   token: XXXXXXXXX
 jobs:
-  # root jobs regexp (default is build.*)
+  # jobs regexp (default is build.*)
   includes: build.*_.*
 dag:
   jeromerobert/project1/master:
@@ -40,7 +40,7 @@ dag:
   jeromerobert/bar/master:
   - jeromerobert/foo/master
 we_only: testfull.*
-email:bob@zboub.com
+email: bob@zboub.com
 ```
 
 then run `gitlab-ci-sched`
@@ -48,7 +48,7 @@ then run `gitlab-ci-sched`
 You should also set all your job as [`except: pushes`](https://docs.gitlab.com/ce/ci/yaml/#only-and-except)
 to avoid doublon in pipeline creation.
 
-To use the `we_only` set your jobs as `when: manual` and they'll be
+To use the `we_only` option set your jobs as `when: manual` and they'll be
 run only during on saturday or sunday.
 
-email: the mail adress given will be passed to the jobs as trigger vairable 'GITLAB_USER_EMAIL'
+The `email` value will be passed to the jobs as the `GITLAB_USER_EMAIL` trigger variable.
