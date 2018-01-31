@@ -278,6 +278,10 @@ class YamlScheduler(Scheduler):
             self.we_only = re.compile(self.config['we_only'])
         else:
             self.we_only = None
+        if 'jobs' in self.config:
+            self.job_includes = re.compile(self.config['jobs']['includes'])
+        else:
+            self.job_includes = re.compile(r'build.*')
 
     def __parse_project(self, name):
         m = self.PROJECT_REGEX.match(name)
@@ -298,8 +302,7 @@ class YamlScheduler(Scheduler):
             raise RuntimeError("Invalid dag")
 
     def _filter_statuses(self, statuses):
-        """ Keep only the build statuses . We don't need to wait for the test jobs to run the next pipeline """
-        return [x for x in statuses if 'build' in x.name and x.name != 'build-next']
+        return [x for x in statuses if self.job_includes.match(x.name)]
 
     def _wait_some_time(self):
         time.sleep(30)

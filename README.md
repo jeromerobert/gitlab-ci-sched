@@ -26,6 +26,9 @@ Create a file named `gitlab-ci-sched.yml` with content like:
 server:
   url: https://gitlab.com
   token: XXXXXXXXX
+jobs:
+  # root jobs regexp (default is build.*)
+  includes: build.*_.*
 dag:
   jeromerobert/project1/master:
   jeromerobert/project2/master:
