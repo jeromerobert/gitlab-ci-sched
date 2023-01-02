@@ -26,8 +26,6 @@ class Scheduler(object):
         self.gitlab_url = gitlab_url
         self.gitlab_token = gitlab_token
         self.gitlab = gitlab.Gitlab(gitlab_url, gitlab_token, api_version=4)
-        # TODO: This should be automatic but it's not (python-gitlab bug)
-        self.gitlab.session.proxies.update(urllib.getproxies_environment())
         # Cache group/project to Gitlab project objects. If projects
         # changes the deamon must be restarted
         self.projects = {}
@@ -106,8 +104,8 @@ class Scheduler(object):
                     by_job[s.name] = l
                 l.append(s)
         result = []
-        for job, s in by_job.iteritems():
-            result.append(sorted(s, None, lambda x: x.created_at)[-1])
+        for job, s in by_job.items():
+            result.append(sorted(s, key=lambda x: x.created_at)[-1])
         return result
 
     def __run_manual_jobs(self, project, statuses):
@@ -158,15 +156,15 @@ class Scheduler(object):
         if len(statuses) == 0:
             return None
         else:
-            return sorted(statuses, None, lambda x: x.finished_at)[-1].finished_at
+            return sorted(statuses, key=lambda x: x.finished_at)[-1].finished_at
 
     @staticmethod
     def __first_started_at(statuses):
-        return sorted(statuses, None, lambda x: x.started_at)[0].started_at
+        return sorted(statuses, key=lambda x: x.started_at)[0].started_at
 
     @staticmethod
     def __first_created_at(statuses):
-        return sorted(statuses, None, lambda x: x.created_at)[0].created_at
+        return sorted(statuses, key=lambda x: x.created_at)[0].created_at
 
     def __get_trigger(self, glproject):
         """ Get or create a trigger """
@@ -272,7 +270,7 @@ class YamlScheduler(Scheduler):
 
     def __init__(self, yaml_file):
         with open(yaml_file) as f:
-            self.config = yaml.load(f)
+            self.config = yaml.safe_load(f)
             Scheduler.__init__(self, self.config['server']['url'], self.config['server']['token'])
         if 'we_only' in self.config:
             self.we_only = re.compile(self.config['we_only'])

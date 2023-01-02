@@ -2,12 +2,12 @@
 
 ## System wide (need root)
 
-`./setup.py install`
+`pip install .`
 
 
 ## User wide
 
-`./setup.py install --user`
+`pip install --user .`
 
 
 ## Virtualenv
@@ -15,7 +15,7 @@
 ```
 virtualenv env
 . env/bin/activate
-./setup.py install
+pip install .
 ```
 
 # Using
