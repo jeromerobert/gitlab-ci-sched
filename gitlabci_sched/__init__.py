@@ -1,5 +1,9 @@
 #! /usr/bin/env python
 
+import http.client
+#http.client.HTTPConnection.debuglevel = 5
+import requests
+requests.packages.urllib3.util.connection.HAS_IPV6 = False
 import yaml
 import gitlab
 import dag
